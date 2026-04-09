@@ -96,7 +96,7 @@ jobs:
         id: extract_version
         shell: bash
         run: |
-          VERSION=$(grep "^version =" py-polars/runtime/polars-runtime-32/Cargo.toml | head -n 1 | cut -d '\"' -f 2)
+          VERSION=$(uv run python -c "import re; content = open('py-polars/runtime/polars-runtime-32/Cargo.toml').read(); print(re.search(r'^version = \"([^\"]+)\"', content, re.M).group(1))")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Upload wheels to artifact
