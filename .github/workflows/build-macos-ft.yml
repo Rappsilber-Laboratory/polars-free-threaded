@@ -43,8 +43,7 @@ jobs:
         
       - name: Build wheels
         run: |
-          # Patch all Cargo.toml files to remove abi3 feature and add free-threaded support safely
-          # We use python to safely handle the string replacements ONLY for pyo3
+          # Patch all Cargo.toml files to remove abi3 feature safely
           uv run python -c "
           import os, re
           for root, dirs, files in os.walk('.'):
@@ -64,15 +63,6 @@ jobs:
                               new_line = new_line.replace('\"abi3-py39\", ', '').replace('\"abi3-py39\"', '')
                               changed = True
                           
-                          # Add free-threaded specifically to pyo3 (exact match)
-                          # We look for lines that define the pyo3 dependency specifically
-                          if re.search(r'\bpyo3\b', new_line) and not re.search(r'\bpyo3-polars\b', new_line) and ('workspace = true' in new_line or 'version =' in new_line):
-                              if '\"free-threaded\"' not in new_line:
-                                  if 'features = [' in new_line:
-                                      new_line = new_line.replace('features = [', 'features = [\"free-threaded\", ')
-                                  elif 'workspace = true' in new_line:
-                                      new_line = new_line.replace('workspace = true', 'workspace = true, features = [\"free-threaded\"]')
-                                  changed = True
                           new_lines.append(new_line)
                       
                       if changed:
@@ -81,6 +71,7 @@ jobs:
           "
           
           # Special case: ensuring root Cargo.toml has free-threaded in its workspace deps
+          # This will automatically propagate to all members that use 'pyo3 = { workspace = true }'
           uv run python -c "
           path = 'Cargo.toml'
           with open(path, 'r') as f:
@@ -88,7 +79,7 @@ jobs:
           with open(path, 'w') as f:
               for line in lines:
                   if 'pyo3 =' in line and ('\"0.26\"' in line or 'version = \"0.26\"' in line):
-                      f.write('pyo3 = { version = \"0.26\", features = [\"free-threaded\"] }\n')
+                      f.write('pyo3 = { version = \"0.26\", features = [\"free-threaded\", \"extension-module\", \"chrono\", \"chrono-tz\", \"multiple-pymethods\"] }\n')
                   else:
                       f.write(line)
           "
