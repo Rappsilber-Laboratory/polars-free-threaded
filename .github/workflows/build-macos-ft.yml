@@ -44,52 +44,44 @@ jobs:
       - name: Build wheels
         run: |
           # Patch all Cargo.toml files to remove abi3 feature safely
-          # PyO3 0.23+ supports free-threading automatically, no feature flag is needed.
-          # We only need to strip 'abi3-py39' to ensure the wheel is correctly tagged for cp313t/cp314t.
+          # We use a broad replacement to ensure no abi3 remains
           uv run python -c "
-          import os, re
+          import os
           for root, dirs, files in os.walk('.'):
               if 'target' in dirs: dirs.remove('target')
               for file in files:
-                  if file == 'Cargo.toml':
+                  if file.endswith('.toml'):
                       path = os.path.join(root, file)
                       with open(path, 'r') as f:
-                          lines = f.readlines()
-                      
-                      new_lines = []
-                      changed = False
-                      for line in lines:
-                          new_line = line
-                          # Strip abi3
-                          if '\"abi3-py39\"' in new_line:
-                              new_line = new_line.replace('\"abi3-py39\", ', '').replace('\"abi3-py39\"', '')
-                              changed = True
-                          
-                          new_lines.append(new_line)
-                      
-                      if changed:
+                          content = f.read()
+                      if 'abi3-py39' in content:
+                          print(f'Patching {path}')
+                          content = content.replace('\"abi3-py39\", ', '').replace(', \"abi3-py39\"', '').replace('\"abi3-py39\"', '')
                           with open(path, 'w') as f:
-                              f.writelines(new_lines)
+                              f.write(content)
           "
           
           # Root Cargo.toml: Ensure no abi3 feature is left in the workspace dependency
           uv run python -c "
           path = 'Cargo.toml'
           with open(path, 'r') as f:
-              lines = f.readlines()
-          with open(path, 'w') as f:
-              for line in lines:
-                  if 'pyo3 =' in line and '\"abi3-py39\"' in line:
-                      f.write(line.replace('\"abi3-py39\", ', '').replace('\"abi3-py39\"', ''))
-                  else:
-                      f.write(line)
+              content = f.read()
+          if 'abi3-py39' in content:
+              content = content.replace('\"abi3-py39\", ', '').replace(', \"abi3-py39\"', '').replace('\"abi3-py39\"', '')
+              with open(path, 'w') as f:
+                  f.write(content)
           "
+
+          # Get absolute paths to interpreters to avoid discovery issues in maturin
+          PY313T=$(uv python find 3.13t)
+          PY314T=$(uv python find 3.14t)
+          echo "Using interpreters: $PY313T and $PY314T"
           
           # Build 3.13t
-          uv run --python 3.13t --with maturin maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi
+          uv run --with maturin maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi --interpreter $PY313T
           
           # Build 3.14t
-          uv run --python 3.14t --with maturin maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi
+          uv run --with maturin maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi --interpreter $PY314T
           
       - name: Extract version
         id: extract_version
