@@ -83,6 +83,12 @@ jobs:
           # Build 3.14t
           uv run --with maturin maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi --interpreter $PY314T
           
+      - name: Build Polars wrapper package
+        run: |
+          cd py-polars
+          uv build
+          cp dist/*.whl ../target/wheels/
+          
       - name: Extract version
         id: extract_version
         run: |
