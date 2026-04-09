@@ -16,9 +16,19 @@ jobs:
       
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            py-polars/runtime/polars-runtime-32
         
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/Cargo.toml"
         
       - name: Install Python 3.13t and 3.14t
         run: |
