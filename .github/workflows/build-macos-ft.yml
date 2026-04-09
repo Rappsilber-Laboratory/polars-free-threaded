@@ -1,0 +1,45 @@
+name: Build MacOS Free-Threaded
+
+on:
+  push:
+    branches:
+      - test-free-threaded
+  workflow_dispatch:
+
+jobs:
+  build-wheels:
+    name: Build wheels on macos-latest
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        
+      - name: Install Python 3.13t and 3.14t
+        run: |
+          uv python install 3.13t
+          uv python install 3.14t
+        
+      - name: Build wheels
+        run: |
+          # Install maturin
+          uv pip install maturin
+          
+          # Remove abi3 feature from Cargo.toml as it's incompatible with free-threading
+          sed -i '' 's/"abi3-py39", //' py-polars/runtime/polars-runtime-32/Cargo.toml
+          
+          # Build 3.13t
+          uv run --python 3.13t maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi
+          
+          # Build 3.14t
+          uv run --python 3.14t maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi
+          
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-macos-amd64
+          path: target/wheels/*.whl

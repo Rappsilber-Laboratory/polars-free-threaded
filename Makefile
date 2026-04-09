@@ -132,6 +132,11 @@ build-dist-release: .venv  ## Compile and install Python Polars binary with supe
 	&& $(VENV_BIN)/maturin develop -m $(RUNTIME_CARGO_TOML) --profile dist-release $(ARGS) --uv \
 	$(FILTER_PIP_WARNINGS)
 
+.PHONY: build-free-threaded
+build-free-threaded: .venv  ## Build free-threaded Python wheels
+	@unset CONDA_PREFIX \
+	&& $(VENV_BIN)/maturin build -m $(RUNTIME_CARGO_TOML) --release --compatibility pypi $(ARGS) --uv
+
 .PHONY: check
 check:  ## Run cargo check with all features
 	cargo check --workspace --all-targets --all-features
