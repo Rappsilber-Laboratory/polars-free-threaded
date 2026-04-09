@@ -44,6 +44,8 @@ jobs:
       - name: Build wheels
         run: |
           # Patch all Cargo.toml files to remove abi3 feature safely
+          # PyO3 0.23+ supports free-threading automatically, no feature flag is needed.
+          # We only need to strip 'abi3-py39' to ensure the wheel is correctly tagged for cp313t/cp314t.
           uv run python -c "
           import os, re
           for root, dirs, files in os.walk('.'):
@@ -70,16 +72,15 @@ jobs:
                               f.writelines(new_lines)
           "
           
-          # Special case: ensuring root Cargo.toml has free-threaded in its workspace deps
-          # This will automatically propagate to all members that use 'pyo3 = { workspace = true }'
+          # Root Cargo.toml: Ensure no abi3 feature is left in the workspace dependency
           uv run python -c "
           path = 'Cargo.toml'
           with open(path, 'r') as f:
               lines = f.readlines()
           with open(path, 'w') as f:
               for line in lines:
-                  if 'pyo3 =' in line and ('\"0.26\"' in line or 'version = \"0.26\"' in line):
-                      f.write('pyo3 = { version = \"0.26\", features = [\"free-threaded\", \"extension-module\", \"chrono\", \"chrono-tz\", \"multiple-pymethods\"] }\n')
+                  if 'pyo3 =' in line and '\"abi3-py39\"' in line:
+                      f.write(line.replace('\"abi3-py39\", ', '').replace('\"abi3-py39\"', ''))
                   else:
                       f.write(line)
           "
