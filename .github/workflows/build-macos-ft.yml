@@ -1,4 +1,4 @@
-name: Build MacOS Free-Threaded
+name: Build Multi-Platform Free-Threaded
 
 
 on:
@@ -9,8 +9,13 @@ on:
 
 jobs:
   build-wheels:
-    name: Build wheels on macos-latest
-    runs-on: macos-latest
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    outputs:
+      version: ${{ steps.extract_version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       
@@ -37,8 +42,16 @@ jobs:
         
       - name: Build wheels
         run: |
-          # Remove abi3 feature from Cargo.toml as it's incompatible with free-threading
-          sed -i '' 's/"abi3-py39", //' py-polars/runtime/polars-runtime-32/Cargo.toml
+          # Patch Cargo.toml to remove abi3 feature (cross-platform)
+          uv run python -c "
+          import os
+          path = 'py-polars/runtime/polars-runtime-32/Cargo.toml'
+          with open(path, 'r') as f:
+              content = f.read()
+          content = content.replace('\"abi3-py39\", ', '')
+          with open(path, 'w') as f:
+              f.write(content)
+          "
           
           # Build 3.13t
           uv run --python 3.13t --with maturin maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi
@@ -46,8 +59,39 @@ jobs:
           # Build 3.14t
           uv run --python 3.14t --with maturin maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi
           
-      - name: Upload wheels
+      - name: Extract version
+        id: extract_version
+        run: |
+          VERSION=$(grep '^version =' py-polars/runtime/polars-runtime-32/Cargo.toml | head -n 1 | cut -d '"' -f 2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload wheels to artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-macos-amd64
+          name: wheels-${{ matrix.os }}
           path: target/wheels/*.whl
+
+  release:
+    name: Create GitHub Release
+    needs: build-wheels
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: wheels
+          merge-multiple: true
+
+      - name: Create or Update Release
+        uses: softprop/action-gh-release@v2
+        with:
+          tag_name: "v${{ needs.build-wheels.outputs.version }}-ft"
+          name: "Polars Free-Threaded v${{ needs.build-wheels.outputs.version }}"
+          files: wheels/*.whl
+          generate_release_notes: true
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
