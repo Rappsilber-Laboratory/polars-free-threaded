@@ -64,9 +64,9 @@ jobs:
                               new_line = new_line.replace('\"abi3-py39\", ', '').replace('\"abi3-py39\"', '')
                               changed = True
                           
-                          # Add free-threaded specifically to pyo3
-                          # We look for lines that define pyo3 dependency
-                          if 'pyo3' in new_line and ('workspace = true' in new_line or 'version =' in new_line):
+                          # Add free-threaded specifically to pyo3 (exact match)
+                          # We look for lines that define the pyo3 dependency specifically
+                          if re.search(r'\bpyo3\b', new_line) and not re.search(r'\bpyo3-polars\b', new_line) and ('workspace = true' in new_line or 'version =' in new_line):
                               if '\"free-threaded\"' not in new_line:
                                   if 'features = [' in new_line:
                                       new_line = new_line.replace('features = [', 'features = [\"free-threaded\", ')
@@ -87,7 +87,7 @@ jobs:
               lines = f.readlines()
           with open(path, 'w') as f:
               for line in lines:
-                  if 'pyo3 = ' in line and '\"0.26\"' in line:
+                  if 'pyo3 =' in line and ('\"0.26\"' in line or 'version = \"0.26\"' in line):
                       f.write('pyo3 = { version = \"0.26\", features = [\"free-threaded\"] }\n')
                   else:
                       f.write(line)
