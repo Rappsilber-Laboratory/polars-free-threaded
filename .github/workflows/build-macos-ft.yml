@@ -43,6 +43,7 @@ jobs:
           uv python install 3.14t
         
       - name: Build wheels
+        shell: bash
         run: |
           # Patch all Cargo.toml files to remove abi3 feature safely
           # We use a broad replacement to ensure no abi3 remains
@@ -79,12 +80,13 @@ jobs:
           echo "Using interpreters: $PY313T and $PY314T"
           
           # Build 3.13t
-          uv run --with maturin maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi --interpreter $PY313T
+          uv run --with maturin maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi --interpreter "$PY313T"
           
           # Build 3.14t
-          uv run --with maturin maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi --interpreter $PY314T
+          uv run --with maturin maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi --interpreter "$PY314T"
           
       - name: Build Polars wrapper package
+        shell: bash
         run: |
           cd py-polars
           uv build
@@ -92,8 +94,9 @@ jobs:
           
       - name: Extract version
         id: extract_version
+        shell: bash
         run: |
-          VERSION=$(grep '^version =' py-polars/runtime/polars-runtime-32/Cargo.toml | head -n 1 | cut -d '"' -f 2)
+          VERSION=$(grep "^version =" py-polars/runtime/polars-runtime-32/Cargo.toml | head -n 1 | cut -d '\"' -f 2)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Upload wheels to artifact
@@ -103,18 +106,18 @@ jobs:
           path: target/wheels/*.whl
 
   release:
-    name: Create GitHub Release
+    name: Create Release
     needs: build-wheels
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
+      - uses: actions/checkout@v4
+      
       - name: Download all wheels
         uses: actions/download-artifact@v4
         with:
           path: wheels
           merge-multiple: true
-
+          
       - name: Create or Update Release
         uses: softprop/action-gh-release@v2
         with:
