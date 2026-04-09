@@ -12,13 +12,13 @@ jobs:
     name: Build wheels on macos-latest
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         
       - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         
       - name: Install Python 3.13t and 3.14t
         run: |
@@ -37,7 +37,7 @@ jobs:
           uv run --python 3.14t --with maturin maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi
           
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-macos-amd64
           path: target/wheels/*.whl
