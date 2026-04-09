@@ -13,7 +13,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        #os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-latest]
     outputs:
       version: ${{ steps.extract_version.outputs.version }}
     steps:
@@ -42,15 +43,46 @@ jobs:
         
       - name: Build wheels
         run: |
-          # Patch Cargo.toml to remove abi3 feature (cross-platform)
+          # Patch all Cargo.toml files to remove abi3 feature and add free-threaded support
+          # We use python to safely handle the string replacements across all members
           uv run python -c "
           import os
-          path = 'py-polars/runtime/polars-runtime-32/Cargo.toml'
+          for root, dirs, files in os.walk('.'):
+              if 'target' in dirs: dirs.remove('target')
+              for file in files:
+                  if file == 'Cargo.toml':
+                      path = os.path.join(root, file)
+                      with open(path, 'r') as f:
+                          content = f.read()
+                      
+                      new_content = content.replace('\"abi3-py39\", ', '')
+                      new_content = new_content.replace('\"abi3-py39\"', '')
+                      
+                      # Add free-threaded feature to pyo3 dependency in root OR members
+                      # For pyo3 0.23+, this is often required or recommended for FT builds
+                      if 'pyo3 =' in new_content and '\"free-threaded\"' not in new_content:
+                          if 'features = [' in new_content:
+                              new_content = new_content.replace('features = [', 'features = [\"free-threaded\", ')
+                          elif 'workspace = true' in new_content:
+                              # If it's a workspace dependency, we might want to add features
+                              new_content = new_content.replace('workspace = true', 'workspace = true, features = [\"free-threaded\"]')
+                      
+                      if new_content != content:
+                          with open(path, 'w') as f:
+                              f.write(new_content)
+          "
+          
+          # Special case: ensuring root Cargo.toml has free-threaded in its workspace deps
+          uv run python -c "
+          path = 'Cargo.toml'
           with open(path, 'r') as f:
-              content = f.read()
-          content = content.replace('\"abi3-py39\", ', '')
+              lines = f.readlines()
           with open(path, 'w') as f:
-              f.write(content)
+              for line in lines:
+                  if 'pyo3 = \"0.26\"' in line:
+                      f.write('pyo3 = { version = \"0.26\", features = [\"free-threaded\"] }\n')
+                  else:
+                      f.write(line)
           "
           
           # Build 3.13t
