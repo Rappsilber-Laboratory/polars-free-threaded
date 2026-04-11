@@ -90,7 +90,11 @@ jobs:
         run: |
           cd py-polars
           uv build
-          cp dist/*.whl ../target/wheels/
+          # Rename wrapper wheels to include OS to avoid collisions when merging artifacts
+          OS_NAME=$(echo "${{ matrix.os }}" | sed 's/-latest//')
+          for f in dist/*.whl; do
+            mv "$f" "../target/wheels/$(basename "$f" .whl)-$OS_NAME.whl"
+          done
           
       - name: Extract version
         id: extract_version
