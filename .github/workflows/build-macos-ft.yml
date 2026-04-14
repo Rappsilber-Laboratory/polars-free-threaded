@@ -86,15 +86,12 @@ jobs:
           uv run --with maturin maturin build -m py-polars/runtime/polars-runtime-32/Cargo.toml --release --compatibility pypi --interpreter "$PY314T"
           
       - name: Build Polars wrapper package
+        if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: |
           cd py-polars
           uv build
-          # Rename wrapper wheels to include OS to avoid collisions when merging artifacts
-          OS_NAME=$(echo "${{ matrix.os }}" | sed 's/-latest//')
-          for f in dist/*.whl; do
-            mv "$f" "../target/wheels/$(basename "$f" .whl)-$OS_NAME.whl"
-          done
+          cp dist/*.whl ../target/wheels/
           
       - name: Extract version
         id: extract_version
